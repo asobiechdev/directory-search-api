@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+*.swp
+*.sln.iml
+appsettings.*.json
