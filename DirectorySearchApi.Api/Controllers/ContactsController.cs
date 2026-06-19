@@ -9,10 +9,12 @@ namespace DirectorySearchApi.Api.Controllers;
 public class ContactsController : ControllerBase
 {
     private readonly IContactSearchService _searchService;
+    private readonly IRabbitMQService _rabbitMQService;
 
-    public ContactsController(IContactSearchService searchService)
+    public ContactsController(IContactSearchService searchService, IRabbitMQService rabbitMQService)
     {
         _searchService = searchService;
+        _rabbitMQService = rabbitMQService;
     }
 
     /// <summary>
@@ -39,5 +41,25 @@ public class ContactsController : ControllerBase
     {
         var results = _searchService.Search("");
         return Ok(results);
+    }
+
+    /// <summary>
+    /// Search contacts and publish query to RabbitMQ for logging/analytics
+    /// </summary>
+    [HttpPost("search-async")]
+    public async Task<ActionResult<object>> SearchAsync([FromBody] SearchQuery searchQuery)
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery.Query))
+            return BadRequest(new { error = "Query is required" });
+
+        var results = _searchService.Search(searchQuery.Query);
+
+        // Publikuj wiadomość do RabbitMQ
+        await _rabbitMQService.PublishAsync(
+            exchangeName: "contacts.exchange",
+            routingKey: "search.query",
+            message: searchQuery);
+
+        return Ok(new { results, message = "Query published to RabbitMQ" });
     }
 }
